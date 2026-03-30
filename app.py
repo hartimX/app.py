@@ -69,7 +69,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Ana Başlık ve Güncellenmiş Slogan
-st.title("THE HARTIM CURVE")
+st.title("THE Hartim Curve")
 st.markdown("<p class='slogan'>Gizli Korku Cevherlerini Keşfet</p>", unsafe_allow_html=True)
 
 # Güncellenmiş Placeholder ile Arama Barı
