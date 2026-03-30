@@ -69,7 +69,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Ana Başlık ve Slogan
-st.title("THE HARTIM CURVE")
+st.title("The Hartim Curve")
 st.markdown("<p class='slogan'>Gizli Korku Cevherlerini Keşfet</p>", unsafe_allow_html=True)
 
 # Arama Barı
