@@ -99,7 +99,7 @@ else:
                 if "Horror" in genre_names and not any(bad in genre_names for bad in ["Animation", "Family"]):
                     
                     # Dinamik Baraj (TMDb: Yeni ise 50, eski ise 300)
-                    if detail.get("vote_count", 0) >= 50:
+                    if detail.get("vote_count", 0) >= 5:
                         movie_id = detail.get('imdb_id')
                         p_tmdb = detail.get("vote_average", 0)
                         is_pure_horror = True
