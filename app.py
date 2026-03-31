@@ -75,14 +75,12 @@ else:
 
     # --- TMDb: TEK TÜR OTORİTESİ ---
     if st.session_state.current_movie_id:
-        # Öneri butonundan geldiyse API zaten sadece saf korku filmlerini filtrelemiştir. Doğrudan kabul ediyoruz.
         tmdb_url = f"https://api.themoviedb.org/3/movie/{st.session_state.current_movie_id}?api_key={TMDB_API_KEY}"
         t_res = requests.get(tmdb_url).json()
         movie_id = t_res.get("imdb_id")
         p_tmdb = t_res.get("vote_average", 0)
         is_pure_horror = True
     else:
-        # Kullanıcı manuel arama yaptıysa TMDb üzerinde ilk 5 popüler sonucu kontrol ediyoruz.
         tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={target}"
         t_search = requests.get(tmdb_url).json()
         
@@ -92,7 +90,7 @@ else:
                 detail = requests.get(f"https://api.themoviedb.org/3/movie/{candidate['id']}?api_key={TMDB_API_KEY}").json()
                 genre_names = [g['name'] for g in detail.get('genres', [])]
                 
-                # SAF KORKU ONAYI: Korku içerecek, Komedi/Animasyon/Aile içermeyecek. OMDb'ye sorulmayacak!
+                # SAF KORKU ONAYI
                 if "Horror" in genre_names and not any(bad in genre_names for bad in ["Comedy", "Animation", "Family"]):
                     movie_id = detail.get('imdb_id')
                     p_tmdb = candidate.get("vote_average", 0)
@@ -100,62 +98,69 @@ else:
                     break
 
     if is_pure_horror and movie_id:
-        # OMDb'ye sadece ID ile bağlanıp Puanları ve Posteri alıyoruz. OMDb'nin Genre verisini tamamen yok sayıyoruz.
         o_data = requests.get(f"http://www.omdbapi.com/?i={movie_id}&apikey={OMDB_API_KEY}").json()
         
         if o_data.get("Response") == "True":
             title = o_data.get("Title")
             poster = o_data.get("Poster")
 
-            # --- AYRIŞMA PROTOKOLÜ (Divergence Shield) ---
+            # --- EKSİK VERİ KORUMALI PUAN TOPLAMA ---
             p_imdb = float(o_data.get("imdbRating", 0)) if o_data.get("imdbRating") != "N/A" else 0
             p_meta = int(o_data.get("Metascore")) / 10 if o_data.get("Metascore") != "N/A" else 0
             p_tomato = 0
             for r in o_data.get("Ratings", []):
                 if r['Source'] == 'Rotten Tomatoes': p_tomato = int(r['Value'].replace('%', '')) / 10
 
-            H = (p_imdb + p_tmdb) / 2
+            # ADALETLİ ORTALAMA HESABI: 0 olan değerler ortalamayı düşürmez!
+            H = (p_imdb + p_tmdb) / 2 if (p_imdb > 0 and p_tmdb > 0) else (p_imdb or p_tmdb)
             E = (p_meta + p_tomato) / 2 if (p_meta > 0 and p_tomato > 0) else (p_meta or p_tomato)
 
-            if H > 0 and E > 0:
-                fark = H - E
-                if fark >= 2.5: B = (H * 0.90) + (E * 0.10)
-                elif fark >= 1.5: B = (H * 0.75) + (E * 0.25)
-                else: B = (H * 0.50) + (E * 0.50)
-            else: B = H or E
+            # EĞER HİÇBİR PUAN YOKSA SİSTEMİ DURDUR
+            if H > 0 or E > 0:
+                # --- AYRIŞMA PROTOKOLÜ (Divergence Shield) ---
+                if H > 0 and E > 0:
+                    fark = H - E
+                    if fark >= 2.5: B = (H * 0.90) + (E * 0.10)
+                    elif fark >= 1.5: B = (H * 0.75) + (E * 0.25)
+                    else: B = (H * 0.50) + (E * 0.50)
+                else: 
+                    B = H or E
 
-            # --- THE HARTIM EQUATION ---
-            h_score = min(B + (0.85 * math.exp(-((B - 6.75)**2) / (2 * 1.8**2))), 10.0)
+                # --- THE HARTIM EQUATION ---
+                h_score = min(B + (0.85 * math.exp(-((B - 6.75)**2) / (2 * 1.8**2))), 10.0)
 
-            # --- ARAYÜZ ÇİZİMİ ---
-            st.divider()
-            c1, c2 = st.columns([1, 1.5])
-            with c1: st.image(poster if poster != "N/A" else "https://via.placeholder.com/300x450")
-            with c2:
-                st.header(title)
+                # --- ARAYÜZ ÇİZİMİ ---
+                st.divider()
+                c1, c2 = st.columns([1, 1.5])
+                with c1: st.image(poster if poster != "N/A" else "https://via.placeholder.com/300x450")
+                with c2:
+                    st.header(title)
+                    
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{p_imdb if p_imdb > 0 else '-'}</b></div>", unsafe_allow_html=True)
+                    m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{p_meta if p_meta > 0 else '-'}</b></div>", unsafe_allow_html=True)
+                    m3.markdown(f"<div class='metric-card'><small>Tomato</small><br><b>{p_tomato if p_tomato > 0 else '-'}</b></div>", unsafe_allow_html=True)
+                    m4.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{p_tmdb:.1f} if p_tmdb > 0 else '-'}</b></div>", unsafe_allow_html=True)
+
+                    st.markdown(f"<div class='hartim-box'><small style='color: #adb5bd;'>THE HARTIM EQUATION RESULT</small><h1 style='text-align: left; color: #ff4b4b; font-size: 80px;'>{h_score:.2f}</h1></div>", unsafe_allow_html=True)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if title not in st.session_state.watched_movies:
+                        if st.button("✅ Bu Filmi İzledim Arşive Ekle", use_container_width=True):
+                            st.session_state.watched_movies.append(title)
+                            st.rerun()
+                    else:
+                        st.success(f"✅ {title} Korku Arşivinizde.")
+
+                    tweet = f"🎬 {title} filminin Hartim Skoru: {h_score:.2f} 🔥\n\nGerçek janr terazisi ile sen de keşfet: [LINK_BURAYA]"
+                    st.link_button("🚀 Sonucu X'te Paylaş", f"https://twitter.com/intent/tweet?text={tweet.replace(' ', '%20')}")
                 
-                m1, m2, m3, m4 = st.columns(4)
-                m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{p_imdb}</b></div>", unsafe_allow_html=True)
-                m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{p_meta}</b></div>", unsafe_allow_html=True)
-                m3.markdown(f"<div class='metric-card'><small>Tomato</small><br><b>{p_tomato}</b></div>", unsafe_allow_html=True)
-                m4.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{p_tmdb:.1f}</b></div>", unsafe_allow_html=True)
-
-                st.markdown(f"<div class='hartim-box'><small style='color: #adb5bd;'>THE HARTIM EQUATION RESULT</small><h1 style='text-align: left; color: #ff4b4b; font-size: 80px;'>{h_score:.2f}</h1></div>", unsafe_allow_html=True)
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                if title not in st.session_state.watched_movies:
-                    if st.button("✅ Bu Filmi İzledim Arşive Ekle", use_container_width=True):
-                        st.session_state.watched_movies.append(title)
-                        st.rerun()
-                else:
-                    st.success(f"✅ {title} Korku Arşivinizde.")
-
-                tweet = f"🎬 {title} filminin Hartim Skoru: {h_score:.2f} 🔥\n\nGerçek janr terazisi ile sen de keşfet: [LINK_BURAYA]"
-                st.link_button("🚀 Sonucu X'te Paylaş", f"https://twitter.com/intent/tweet?text={tweet.replace(' ', '%20')}")
-            
-            st.session_state.current_movie_id = ""
+                st.session_state.current_movie_id = ""
+            else:
+                st.warning("🛑 Bu film için hesaplama yapılabilecek hiçbir platform puanı bulunamadı.")
+                st.session_state.current_movie_id = ""
         else:
-            st.error("🛑 Film puanları çekilirken bir hata oluştu.")
+            st.error("🛑 Film verileri çekilirken bir hata oluştu.")
             st.session_state.current_movie_id = ""
     else:
         st.error("🛑 Bu uygulama sadece SAF KORKU filmleri içindir. Komedi, animasyon veya aile filmleri kabul edilmez. Veya sistem eşleşme sağlayamadı.")
