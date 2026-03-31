@@ -17,16 +17,36 @@ if 'current_movie_id' not in st.session_state: st.session_state.current_movie_id
 if 'search_query' not in st.session_state: st.session_state.search_query = ""
 
 def get_random_horror():
-    page = random.randint(1, 25)
-    # Komedi (35) yasağı kaldırıldı! Korku-Komediler artık serbest.
-    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&with_genres=27&without_genres=16,10751&vote_count.gte=50&page={page}"
-    res = requests.get(url).json()
-    if res.get("results"):
-        movies = [m for m in res['results'] if m['title'] not in st.session_state.watched_movies]
-        if movies:
-            chosen = random.choice(movies)
-            st.session_state.current_movie_id = chosen.get("id")
-            st.session_state.search_query = chosen.get("title")
+    # Arka planda 1000 oy barajını geçene kadar sessizce zar atar (Maksimum 5 sayfa dener)
+    for _ in range(5):
+        page = random.randint(1, 25)
+        # Komedi (35) yasağı kaldırıldı! Korku-Komediler artık serbest.
+        url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&with_genres=27&without_genres=16,10751&vote_count.gte=50&page={page}"
+        res = requests.get(url).json()
+        
+        if res.get("results"):
+            movies = [m for m in res['results'] if m['title'] not in st.session_state.watched_movies]
+            random.shuffle(movies) # Rastgeleliği artırmak için karıştır
+            
+            for chosen in movies:
+                tmdb_id = chosen.get("id")
+                # OMDb baraj kontrolünü sana göstermeden arka planda yap
+                detail = requests.get(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}").json()
+                imdb_id = detail.get("imdb_id")
+                
+                if imdb_id:
+                    o_data = requests.get(f"http://www.omdbapi.com/?i={imdb_id}&apikey={OMDB_API_KEY}").json()
+                    if o_data.get("Response") == "True":
+                        try:
+                            imdb_votes = int(o_data.get("imdbVotes", "0").replace(",", ""))
+                        except:
+                            imdb_votes = 0
+                        
+                        # Eğer 1000 oyu geçiyorsa ekrana basmak üzere hafızaya al ve döngüyü bitir!
+                        if imdb_votes >= 1000:
+                            st.session_state.current_movie_id = tmdb_id
+                            st.session_state.search_query = chosen.get("title")
+                            return
 
 # Görsel Stil
 st.markdown("""
@@ -36,7 +56,8 @@ st.markdown("""
     .main { background-color: #000000; color: white; }
     h1 { color: #ff0000; text-align: center; font-weight: 900; letter-spacing: -2px; margin-bottom: 0px; }
     .slogan { text-align: center; color: #adb5bd; font-size: 1.1rem; margin-top: 5px; margin-bottom: 20px; }
-    .stTextInput input { color: #ffffff !important; background-color: #1a1c23 !important; -webkit-text-fill-color: #ffffff !important; border: 2px solid #ff0000; border-radius: 5px; padding: 10px; }     .stTextInput input::placeholder { color: #adb5bd !important; -webkit-text-fill-color: #adb5bd !important; opacity: 0.8 !important; }
+    .stTextInput input { color: #ffffff !important; background-color: #1a1c23 !important; -webkit-text-fill-color: #ffffff !important; border: 2px solid #ff0000; border-radius: 5px; padding: 10px; }
+    .stTextInput input::placeholder { color: #adb5bd !important; -webkit-text-fill-color: #adb5bd !important; opacity: 0.8 !important; }
     .metric-card { background-color: #1a1c23; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #2d3139; color: #ffffff; }
     .metric-card small { color: #adb5bd; }
     .metric-card a { color: #ffffff; text-decoration: none; border-bottom: 1px dashed #adb5bd; }
@@ -76,7 +97,7 @@ else:
     p_tmdb = 0
     is_pure_horror = False
 
-    # --- TMDb: TEK TÜR OTORİTESİ VE DİNAMİK BARAJ ---
+    # --- TMDb: TEK TÜR OTORİTESİ ---
     if st.session_state.current_movie_id:
         tmdb_url = f"https://api.themoviedb.org/3/movie/{st.session_state.current_movie_id}?api_key={TMDB_API_KEY}"
         t_res = requests.get(tmdb_url).json()
@@ -98,7 +119,6 @@ else:
                 # SAF KORKU (Komedi artık dışlanmıyor)
                 if "Horror" in genre_names and not any(bad in genre_names for bad in ["Animation", "Family"]):
                     
-                    # Dinamik Baraj (TMDb: Yeni ise 50)
                     if detail.get("vote_count", 0) >= 30:
                         movie_id = detail.get('imdb_id')
                         p_tmdb = detail.get("vote_average", 0)
@@ -118,7 +138,7 @@ else:
                 imdb_votes = 0
                 
             if imdb_votes < 1000:
-                st.error(f"🛑 Güvenlik Barajı: Bu film IMDb'de 1000 oy barajını geçemediği için (Oy: {imdb_votes}) The Hartim Curve tarafından reddedildi.")
+                st.info(f"🛑 Güvenlik Barajı: Bu film IMDb'de 1000 oy barajını geçemediği için (Oy: {imdb_votes}) The Hartim Curve tarafından reddedildi.")
                 st.session_state.current_movie_id = ""
                 st.stop()
             
@@ -151,7 +171,6 @@ else:
                 h_score = min(B + (0.85 * math.exp(-((B - 6.75)**2) / (2 * 1.8**2))), 10.0)
                 
                 # --- UI İÇİN GÜVENLİ PUAN FORMATLAMASI ---
-                # IMDb Puanı artık tıklanabilir
                 if p_imdb > 0:
                     imdb_str = f"<a href='https://www.imdb.com/title/{movie_id}/' target='_blank' title='IMDb Sayfasına Git'><b>{p_imdb} <span style='font-size: 0.8em;'>↗</span></b></a>"
                 else:
@@ -187,11 +206,11 @@ else:
                 
                 st.session_state.current_movie_id = ""
             else:
-                st.warning("🛑 Bu film için hesaplama yapılabilecek hiçbir platform puanı bulunamadı.")
+                st.info("🛑 Bu film için hesaplama yapılabilecek hiçbir platform puanı bulunamadı.")
                 st.session_state.current_movie_id = ""
         else:
-            st.error("🛑 Film verileri çekilirken bir hata oluştu.")
+            st.info("🛑 Film verileri çekilirken bir hata oluştu.")
             st.session_state.current_movie_id = ""
     else:
-        st.error("🛑 The Hartim Curve güvenlik barajları: Bu film yeterli oy sayısına ulaşamamış (TMDb Dinamik Barajı) veya animasyon/aile filmi kategorisine girmiş olabilir.")
+        st.info("🛑 The Hartim Curve güvenlik barajları: Bu film yeterli oy sayısına ulaşamamış veya animasyon/aile filmi kategorisine girmiş olabilir.")
         st.session_state.current_movie_id = ""
