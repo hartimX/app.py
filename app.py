@@ -171,7 +171,7 @@ else:
                 # --- UI İÇİN GÜVENLİ PUAN FORMATLAMASI ---
                 # IMDb Puanı artık tıklanabilir
                 if p_imdb > 0:
-                    imdb_str = f"<a href='https://www.imdb.com/title/{movie_id}/' target='_blank' title='IMDb Sayfasına Git'><b>{p_imdb}</b></a>"
+                    imdb_str = f"<a href='https://www.imdb.com/title/{movie_id}/' target='_blank' title='IMDb Sayfasına Git'><b>{p_imdb} <span style='font-size: 0.8em;'>↗</span></b></a>"
                 else:
                     imdb_str = "<b>-</b>"
                     
