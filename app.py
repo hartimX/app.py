@@ -36,7 +36,7 @@ st.markdown("""
     .main { background-color: #000000; color: white; }
     h1 { color: #ff0000; text-align: center; font-weight: 900; letter-spacing: -2px; margin-bottom: 0px; }
     .slogan { text-align: center; color: #adb5bd; font-size: 1.1rem; margin-top: 5px; margin-bottom: 20px; }
-    .stTextInput input { color: #ffffff !important; background-color: #1a1c23; border: 2px solid #ff0000; border-radius: 5px; padding: 10px; }
+    .stTextInput input { color: #ffffff !important; background-color: #1a1c23 !important; -webkit-text-fill-color: #ffffff !important; border: 2px solid #ff0000; border-radius: 5px; padding: 10px; }     .stTextInput input::placeholder { color: #adb5bd !important; -webkit-text-fill-color: #adb5bd !important; opacity: 0.8 !important; }
     .metric-card { background-color: #1a1c23; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #2d3139; color: #ffffff; }
     .metric-card small { color: #adb5bd; }
     .metric-card a { color: #ffffff; text-decoration: none; border-bottom: 1px dashed #adb5bd; }
