@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import math
 import random
+from datetime import datetime
 
 # --- API ANAHTARLARI ---
 OMDB_API_KEY = "230D910E"
@@ -17,8 +18,8 @@ if 'search_query' not in st.session_state: st.session_state.search_query = ""
 
 def get_random_horror():
     page = random.randint(1, 25)
-    # Sadece Korku (27). Animasyon(16), Komedi(35) ve Aile(10751) TMDb seviyesinde filtrelenerek saf dışı bırakılır!
-    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&with_genres=27&without_genres=16,35,10751&vote_count.gte=50&page={page}"
+    # Komedi (35) yasağı kaldırıldı! Korku-Komediler artık serbest.
+    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&with_genres=27&without_genres=16,10751&vote_count.gte=50&page={page}"
     res = requests.get(url).json()
     if res.get("results"):
         movies = [m for m in res['results'] if m['title'] not in st.session_state.watched_movies]
@@ -27,7 +28,7 @@ def get_random_horror():
             st.session_state.current_movie_id = chosen.get("id")
             st.session_state.search_query = chosen.get("title")
 
-# Görsel Stil (Premium Tasarım + Kaydırma Çubuğu Gizleme)
+# Görsel Stil
 st.markdown("""
     <style>
     ::-webkit-scrollbar { display: none; }
@@ -38,6 +39,8 @@ st.markdown("""
     .stTextInput input { color: #ffffff !important; background-color: #1a1c23; border: 2px solid #ff0000; border-radius: 5px; padding: 10px; }
     .metric-card { background-color: #1a1c23; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #2d3139; color: #ffffff; }
     .metric-card small { color: #adb5bd; }
+    .metric-card a { color: #ffffff; text-decoration: none; border-bottom: 1px dashed #adb5bd; }
+    .metric-card a:hover { color: #ff4b4b; border-bottom: 1px solid #ff4b4b; }
     .hartim-box { background-color: #1a1c23; padding: 30px; border-radius: 20px; border-left: 10px solid #ff4b4b; margin-top: 20px; box-shadow: 0 10px 30px rgba(255,0,0,0.2); }
     [data-testid="stSidebar"] { background-color: #0b0d11; border-right: 1px solid #2d3139; }
     .opening-screen { text-align: center; margin-top: 100px; padding: 20px; }
@@ -73,56 +76,92 @@ else:
     p_tmdb = 0
     is_pure_horror = False
 
-    # --- TMDb: TEK TÜR OTORİTESİ ---
+    # --- TMDb: TEK TÜR OTORİTESİ VE DİNAMİK BARAJ ---
     if st.session_state.current_movie_id:
         tmdb_url = f"https://api.themoviedb.org/3/movie/{st.session_state.current_movie_id}?api_key={TMDB_API_KEY}"
         t_res = requests.get(tmdb_url).json()
-        movie_id = t_res.get("imdb_id")
-        p_tmdb = t_res.get("vote_average", 0)
-        is_pure_horror = True
+        
+        # Dinamik Baraj Kontrolü (Random seçimden gelse bile)
+        try:
+            rel_date = datetime.strptime(t_res.get("release_date", "1900-01-01"), "%Y-%m-%d").date()
+            months_diff = (datetime.now().date() - rel_date).days / 30
+        except:
+            months_diff = 100
+            
+        min_votes = 50 if months_diff <= 6 else 300
+        
+        if t_res.get("vote_count", 0) >= min_votes:
+            movie_id = t_res.get("imdb_id")
+            p_tmdb = t_res.get("vote_average", 0)
+            is_pure_horror = True
+
     else:
         tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={target}"
         t_search = requests.get(tmdb_url).json()
         
         if t_search.get("results"):
-            # En çok oy alan (en güvenilir) filmi seç
             valid_results = sorted(t_search['results'], key=lambda x: x.get('vote_count', 0), reverse=True)
             for candidate in valid_results[:5]:
                 detail = requests.get(f"https://api.themoviedb.org/3/movie/{candidate['id']}?api_key={TMDB_API_KEY}").json()
                 genre_names = [g['name'] for g in detail.get('genres', [])]
                 
-                # SAF KORKU ONAYI
-                if "Horror" in genre_names and not any(bad in genre_names for bad in ["Comedy", "Animation", "Family"]):
-                    movie_id = detail.get('imdb_id')
-                    p_tmdb = candidate.get("vote_average", 0)
-                    is_pure_horror = True
-                    break
+                # SAF KORKU (Komedi artık dışlanmıyor)
+                if "Horror" in genre_names and not any(bad in genre_names for bad in ["Animation", "Family"]):
+                    
+                    # Dinamik Baraj (TMDb: Yeni ise 50, eski ise 300)
+                    try:
+                        rel_date = datetime.strptime(detail.get("release_date", "1900-01-01"), "%Y-%m-%d").date()
+                        months_diff = (datetime.now().date() - rel_date).days / 30
+                    except:
+                        months_diff = 100
+                        
+                    min_votes = 50 if months_diff <= 6 else 300
+                    
+                    if detail.get("vote_count", 0) >= min_votes:
+                        movie_id = detail.get('imdb_id')
+                        p_tmdb = detail.get("vote_average", 0)
+                        is_pure_horror = True
+                        break
 
     if is_pure_horror and movie_id:
         o_data = requests.get(f"http://www.omdbapi.com/?i={movie_id}&apikey={OMDB_API_KEY}").json()
         
         if o_data.get("Response") == "True":
+            
+            # --- IMDb 1000 OY BARAJI (Eş-Dost Koruması) ---
+            imdb_votes_str = o_data.get("imdbVotes", "0").replace(",", "")
+            try:
+                imdb_votes = int(imdb_votes_str)
+            except:
+                imdb_votes = 0
+                
+            if imdb_votes < 1000:
+                st.error(f"🛑 Güvenlik Barajı: Bu film IMDb'de 1000 oy barajını geçemediği için (Oy: {imdb_votes}) The Hartim Curve tarafından reddedildi.")
+                st.session_state.current_movie_id = ""
+                st.stop()
+            
             title = o_data.get("Title")
             poster = o_data.get("Poster")
 
-            # --- ROTTEN TOMATOES SİSTEMDEN TAMAMEN SİLİNDİ ---
+            # Rotten Tomatoes İptal
             p_imdb = float(o_data.get("imdbRating", 0)) if o_data.get("imdbRating") != "N/A" else 0
             p_meta = int(o_data.get("Metascore")) / 10 if o_data.get("Metascore") != "N/A" else 0
 
-            # --- SEYİRCİ VE ELEŞTİRMEN TERAZİSİ (ADALETLİ HESAPLAMA) ---
-            # H: Seyirci (IMDb ve TMDb)
+            # --- SEYİRCİ VE ELEŞTİRMEN TERAZİSİ (v5.2) ---
             H = (p_imdb + p_tmdb) / 2 if (p_imdb > 0 and p_tmdb > 0) else (p_imdb or p_tmdb)
-            
-            # E: Eleştirmen (Sadece Metacritic)
             E = p_meta
 
             if H > 0 or E > 0:
-                # --- AYRIŞMA PROTOKOLÜ (Divergence Shield) ---
                 if H > 0 and E > 0:
-                    fark = H - E
-                    if fark >= 2.5: B = (H * 0.90) + (E * 0.10)
-                    elif fark >= 1.5: B = (H * 0.75) + (E * 0.25)
-                    else: B = (H * 0.50) + (E * 0.50)
+                    if H - E >= 1.5:
+                        # Korku Severin Kalkanı: Seyirci sevdi, eleştirmen gömdü
+                        B = (H * 0.90) + (E * 0.10)
+                    elif E - H >= 1.5:
+                        # Anti-Snob Freni: Eleştirmen sevdi, seyirci gömdü
+                        B = (H * 0.80) + (E * 0.20)
+                    else:
+                        # Diplomatik: Doğal Salınım
+                        B = (H * 0.50) + (E * 0.50)
                 else: 
                     B = H or E
 
@@ -130,22 +169,26 @@ else:
                 h_score = min(B + (0.85 * math.exp(-((B - 6.75)**2) / (2 * 1.8**2))), 10.0)
                 
                 # --- UI İÇİN GÜVENLİ PUAN FORMATLAMASI ---
-                imdb_str = p_imdb if p_imdb > 0 else "-"
-                meta_str = p_meta if p_meta > 0 else "-"
-                tmdb_str = f"{p_tmdb:.1f}" if p_tmdb > 0 else "-"
+                # IMDb Puanı artık tıklanabilir
+                if p_imdb > 0:
+                    imdb_str = f"<a href='https://www.imdb.com/title/{movie_id}/' target='_blank' title='IMDb Sayfasına Git'><b>{p_imdb}</b></a>"
+                else:
+                    imdb_str = "<b>-</b>"
+                    
+                meta_str = f"<b>{p_meta}</b>" if p_meta > 0 else "<b>-</b>"
+                tmdb_str = f"<b>{p_tmdb:.1f}</b>" if p_tmdb > 0 else "<b>-</b>"
 
-                # --- ARAYÜZ ÇİZİMİ (3'LÜ KOLON SİSTEMİ) ---
+                # --- ARAYÜZ ÇİZİMİ ---
                 st.divider()
                 c1, c2 = st.columns([1, 1.5])
                 with c1: st.image(poster if poster != "N/A" else "https://via.placeholder.com/300x450")
                 with c2:
                     st.header(title)
                     
-                    # 4 kolon yerine dengeli 3 kolon
                     m1, m2, m3 = st.columns(3)
-                    m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{imdb_str}</b></div>", unsafe_allow_html=True)
-                    m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{meta_str}</b></div>", unsafe_allow_html=True)
-                    m3.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{tmdb_str}</b></div>", unsafe_allow_html=True)
+                    m1.markdown(f"<div class='metric-card'><small>IMDb</small><br>{imdb_str}</div>", unsafe_allow_html=True)
+                    m2.markdown(f"<div class='metric-card'><small>Meta</small><br>{meta_str}</div>", unsafe_allow_html=True)
+                    m3.markdown(f"<div class='metric-card'><small>TMDb</small><br>{tmdb_str}</div>", unsafe_allow_html=True)
 
                     st.markdown(f"<div class='hartim-box'><small style='color: #adb5bd;'>THE HARTIM EQUATION RESULT</small><h1 style='text-align: left; color: #ff4b4b; font-size: 80px;'>{h_score:.2f}</h1></div>", unsafe_allow_html=True)
                     
@@ -168,5 +211,5 @@ else:
             st.error("🛑 Film verileri çekilirken bir hata oluştu.")
             st.session_state.current_movie_id = ""
     else:
-        st.error("🛑 Bu uygulama sadece SAF KORKU filmleri içindir. Komedi, animasyon veya aile filmleri kabul edilmez. Veya sistem eşleşme sağlayamadı.")
+        st.error("🛑 The Hartim Curve güvenlik barajları: Bu film yeterli oy sayısına ulaşamamış (TMDb Dinamik Barajı) veya animasyon/aile filmi kategorisine girmiş olabilir.")
         st.session_state.current_movie_id = ""
