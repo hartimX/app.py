@@ -128,6 +128,12 @@ else:
 
                 # --- THE HARTIM EQUATION ---
                 h_score = min(B + (0.85 * math.exp(-((B - 6.75)**2) / (2 * 1.8**2))), 10.0)
+                
+                # --- UI İÇİN GÜVENLİ PUAN FORMATLAMASI ---
+                imdb_str = p_imdb if p_imdb > 0 else "-"
+                meta_str = p_meta if p_meta > 0 else "-"
+                tomato_str = p_tomato if p_tomato > 0 else "-"
+                tmdb_str = f"{p_tmdb:.1f}" if p_tmdb > 0 else "-"
 
                 # --- ARAYÜZ ÇİZİMİ ---
                 st.divider()
@@ -137,10 +143,10 @@ else:
                     st.header(title)
                     
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{p_imdb if p_imdb > 0 else '-'}</b></div>", unsafe_allow_html=True)
-                    m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{p_meta if p_meta > 0 else '-'}</b></div>", unsafe_allow_html=True)
-                    m3.markdown(f"<div class='metric-card'><small>Tomato</small><br><b>{p_tomato if p_tomato > 0 else '-'}</b></div>", unsafe_allow_html=True)
-                    m4.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{p_tmdb:.1f} if p_tmdb > 0 else '-'}</b></div>", unsafe_allow_html=True)
+                    m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{imdb_str}</b></div>", unsafe_allow_html=True)
+                    m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{meta_str}</b></div>", unsafe_allow_html=True)
+                    m3.markdown(f"<div class='metric-card'><small>Tomato</small><br><b>{tomato_str}</b></div>", unsafe_allow_html=True)
+                    m4.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{tmdb_str}</b></div>", unsafe_allow_html=True)
 
                     st.markdown(f"<div class='hartim-box'><small style='color: #adb5bd;'>THE HARTIM EQUATION RESULT</small><h1 style='text-align: left; color: #ff4b4b; font-size: 80px;'>{h_score:.2f}</h1></div>", unsafe_allow_html=True)
                     
