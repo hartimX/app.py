@@ -80,17 +80,7 @@ else:
     if st.session_state.current_movie_id:
         tmdb_url = f"https://api.themoviedb.org/3/movie/{st.session_state.current_movie_id}?api_key={TMDB_API_KEY}"
         t_res = requests.get(tmdb_url).json()
-        
-        # Dinamik Baraj Kontrolü (Random seçimden gelse bile)
-        try:
-            rel_date = datetime.strptime(t_res.get("release_date", "1900-01-01"), "%Y-%m-%d").date()
-            months_diff = (datetime.now().date() - rel_date).days / 30
-        except:
-            months_diff = 100
-            
-        min_votes = 50 if months_diff <= 6 else 300
-        
-        if t_res.get("vote_count", 0) >= min_votes:
+        if t_res.get("vote_count", 0) >= 50:
             movie_id = t_res.get("imdb_id")
             p_tmdb = t_res.get("vote_average", 0)
             is_pure_horror = True
@@ -109,15 +99,7 @@ else:
                 if "Horror" in genre_names and not any(bad in genre_names for bad in ["Animation", "Family"]):
                     
                     # Dinamik Baraj (TMDb: Yeni ise 50, eski ise 300)
-                    try:
-                        rel_date = datetime.strptime(detail.get("release_date", "1900-01-01"), "%Y-%m-%d").date()
-                        months_diff = (datetime.now().date() - rel_date).days / 30
-                    except:
-                        months_diff = 100
-                        
-                    min_votes = 50 if months_diff <= 6 else 300
-                    
-                    if detail.get("vote_count", 0) >= min_votes:
+                    if detail.get("vote_count", 0) >= 50:
                         movie_id = detail.get('imdb_id')
                         p_tmdb = detail.get("vote_average", 0)
                         is_pure_horror = True
