@@ -63,7 +63,7 @@ st.markdown("<p class='slogan'>Gizli Korku Cevherlerini Keşfet</p>", unsafe_all
 # Arama ve Öneri Barı
 col_search, col_btn = st.columns([4, 1.2])
 with col_search:
-    st.text_input("", placeholder="Korku filmi yazın...", key="search_query")
+    st.text_input("", placeholder="Korku filmini ingilizce yazın...", key="search_query")
 with col_btn:
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
     st.button("Bana Korku Öner 🎲", use_container_width=True, on_click=get_random_horror)
