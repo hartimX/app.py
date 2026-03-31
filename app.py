@@ -85,6 +85,7 @@ else:
         t_search = requests.get(tmdb_url).json()
         
         if t_search.get("results"):
+            # En çok oy alan (en güvenilir) filmi seç
             valid_results = sorted(t_search['results'], key=lambda x: x.get('vote_count', 0), reverse=True)
             for candidate in valid_results[:5]:
                 detail = requests.get(f"https://api.themoviedb.org/3/movie/{candidate['id']}?api_key={TMDB_API_KEY}").json()
@@ -104,18 +105,17 @@ else:
             title = o_data.get("Title")
             poster = o_data.get("Poster")
 
-            # --- EKSİK VERİ KORUMALI PUAN TOPLAMA ---
+            # --- ROTTEN TOMATOES SİSTEMDEN TAMAMEN SİLİNDİ ---
             p_imdb = float(o_data.get("imdbRating", 0)) if o_data.get("imdbRating") != "N/A" else 0
             p_meta = int(o_data.get("Metascore")) / 10 if o_data.get("Metascore") != "N/A" else 0
-            p_tomato = 0
-            for r in o_data.get("Ratings", []):
-                if r['Source'] == 'Rotten Tomatoes': p_tomato = int(r['Value'].replace('%', '')) / 10
 
-            # ADALETLİ ORTALAMA HESABI: 0 olan değerler ortalamayı düşürmez!
+            # --- SEYİRCİ VE ELEŞTİRMEN TERAZİSİ (ADALETLİ HESAPLAMA) ---
+            # H: Seyirci (IMDb ve TMDb)
             H = (p_imdb + p_tmdb) / 2 if (p_imdb > 0 and p_tmdb > 0) else (p_imdb or p_tmdb)
-            E = (p_meta + p_tomato) / 2 if (p_meta > 0 and p_tomato > 0) else (p_meta or p_tomato)
+            
+            # E: Eleştirmen (Sadece Metacritic)
+            E = p_meta
 
-            # EĞER HİÇBİR PUAN YOKSA SİSTEMİ DURDUR
             if H > 0 or E > 0:
                 # --- AYRIŞMA PROTOKOLÜ (Divergence Shield) ---
                 if H > 0 and E > 0:
@@ -132,21 +132,20 @@ else:
                 # --- UI İÇİN GÜVENLİ PUAN FORMATLAMASI ---
                 imdb_str = p_imdb if p_imdb > 0 else "-"
                 meta_str = p_meta if p_meta > 0 else "-"
-                tomato_str = p_tomato if p_tomato > 0 else "-"
                 tmdb_str = f"{p_tmdb:.1f}" if p_tmdb > 0 else "-"
 
-                # --- ARAYÜZ ÇİZİMİ ---
+                # --- ARAYÜZ ÇİZİMİ (3'LÜ KOLON SİSTEMİ) ---
                 st.divider()
                 c1, c2 = st.columns([1, 1.5])
                 with c1: st.image(poster if poster != "N/A" else "https://via.placeholder.com/300x450")
                 with c2:
                     st.header(title)
                     
-                    m1, m2, m3, m4 = st.columns(4)
+                    # 4 kolon yerine dengeli 3 kolon
+                    m1, m2, m3 = st.columns(3)
                     m1.markdown(f"<div class='metric-card'><small>IMDb</small><br><b>{imdb_str}</b></div>", unsafe_allow_html=True)
                     m2.markdown(f"<div class='metric-card'><small>Meta</small><br><b>{meta_str}</b></div>", unsafe_allow_html=True)
-                    m3.markdown(f"<div class='metric-card'><small>Tomato</small><br><b>{tomato_str}</b></div>", unsafe_allow_html=True)
-                    m4.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{tmdb_str}</b></div>", unsafe_allow_html=True)
+                    m3.markdown(f"<div class='metric-card'><small>TMDb</small><br><b>{tmdb_str}</b></div>", unsafe_allow_html=True)
 
                     st.markdown(f"<div class='hartim-box'><small style='color: #adb5bd;'>THE HARTIM EQUATION RESULT</small><h1 style='text-align: left; color: #ff4b4b; font-size: 80px;'>{h_score:.2f}</h1></div>", unsafe_allow_html=True)
                     
