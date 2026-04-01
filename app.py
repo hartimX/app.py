@@ -8,8 +8,30 @@ from datetime import datetime
 OMDB_API_KEY = "230D910E"
 TMDB_API_KEY = "ffa196d9c44790c7864d5aa4a06ca623"
 
-# Sayfa Yapılandırması
-st.set_page_config(page_title="The Hartim Curve", page_icon="⚖️", layout="wide")
+
+# Sayfa Yapılandırması (kapak görseli)
+st.set_page_config(
+    page_title="The Hartim Curve | Gerçek Korku Terazisi", 
+    page_icon="⚖️", 
+    layout="wide",
+    menu_items={
+        'Get Help': 'https://twitter.com/senin_twitter_hesabin',
+        'About': "The Hartim Curve: Gizli Korku Cevherlerini Keşfet"
+    }
+)
+
+# Streamlit için meta etiketleri eklemek (X Önizlemesi İçin)
+st.markdown(f"""
+    <head>
+        <meta property="og:title" content="The Hartim Curve | Gerçek Korku Terazisi" />
+        <meta property="og:description" content="Gizli Korku Cevherlerini Keşfet. Kendi korku zevkini test et!" />
+        <meta property="og:image" content="https://github.com/hartimX/app.py/blob/main/12.jpg?raw=true" />
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:title" content="The Hartim Curve | Gerçek Korku Terazisi" />
+        <meta property="twitter:description" content="Gizli Korku Cevherlerini Keşfet. Kendi korku zevkini test et!" />
+        <meta property="twitter:image" content="https://github.com/hartimX/app.py/blob/main/12.jpg?raw=true" />
+    </head>
+""", unsafe_allow_html=True)
 
 # --- HAFIZA YÖNETİMİ ---
 if 'watched_movies' not in st.session_state: st.session_state.watched_movies = []
